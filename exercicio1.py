@@ -13,7 +13,7 @@ class StringGenerator(object):
                         self.tempo=tempop
                         self.local=localp
                         meetings.append(self)
-                        print self.__dict__
+                        print (self.__dict__)
                         return 'done!'
                 except:
                         return "erro"

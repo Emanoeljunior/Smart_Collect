@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import random
 import string
 import cherrypy
@@ -8,9 +9,8 @@ import sqlite3
 frontpage = """<html>
 	<head><meta charset="UTF-8"></head>
 		<body>
-		<h1>Welcome to meetings agenda!</h1>
+		<h1>Welcome to Smart Collect!</h1>
 		<h3>Please use the REST api:</h3>
-		<p>Examples</p>
                 </body>
                 </html>
 			"""
@@ -23,6 +23,7 @@ def setup_database():
     with sqlite3.connect(DB_STRING) as con:
         try:
             con.execute("CREATE TABLE lixeiras (codigo varchar(255), volume int, local varchar(255))")
+            con.execute("CREATE TABLE truckers (codigo varchar(255), volume int, local varchar(255))")
         except:
             print ('already exists')
             
@@ -31,7 +32,8 @@ def cleanup_database():
     Destruir tabela de lixeiras
     """
     with sqlite3.connect(DB_STRING) as con:
-        con.execute("DROP TABLE lixeiras")                    
+        con.execute("DROP TABLE lixeiras")
+        con.execute("DROP TABLE truckers")                    
 
 class Interface(object):
     @cherrypy.expose
@@ -57,10 +59,12 @@ class Lixeira(object):
 class Data():
     exposed = True
     
-    #curl -v http://192.168.0.13:8080/api/data/codigo
-    #curl -v http://192.168.0.13:8080/api/data/
-    @cherrypy.tools.json_out()
-        
+   
+    # Método GET que será utilizado pelo admin e pela API do google
+    #modos para testar:
+    #curl -v http://192.168.0.13:8080/api/data/local - substituir pelo ip da máquina
+    #curl -v http://192.168.0.13:8080/api/data/ - substituir pelo ip da máquina
+    @cherrypy.tools.json_out()   
     def GET(self, local=None):
         if local is None:
             l=[]
@@ -75,16 +79,21 @@ class Data():
                 return('Lixeiras \n: %s' % str(l) )
         else:
             with sqlite3.connect(DB_STRING) as c:
-                r = c.execute('SELECT * FROM lixeiras WHERE codigo like ?',[local])
-                if r.fetchone() is not None:
+                r = c.execute('SELECT * FROM lixeiras WHERE local like ?',[local])
+                variavel = r.fetchone()
+                if variavel is not None:
                     lixeira = Lixeira()
-                    lixeira.codigo = r.fetchone()[0]
-                    lixeira.volume = r.fetchone()[1]
-                    lixeira.local = r.fetchone()[2]
+                    lixeira.codigo = variavel[0] 
+                    lixeira.volume = variavel[1]
+                    lixeira.local = variavel[2]
                     return(lixeira.return_JSON())
                 else:
                     return None
  
+    #Metodo POST utilizado pelo dispositivo IOT (lixeiras) - enviando para o Servidor
+    #modos para testar:
+    #curl -H "Content-Type: application/json" -X POST -d '{"codigo":"12A", "volume":"100", "local":"102"}' http://192.168.0.13:8080/api/data
+    #WINDOWS: curl -H "Content-Type: application/json" -X POST -d "{\"codigo\":\"12A\", \"volume\":\"100\", "local\":\"102\"}" http://192.168.0.13:8080/api/data
     @cherrypy.tools.json_in()
     def POST(self):
         data = cherrypy.request.json
@@ -97,7 +106,9 @@ class Data():
             c.commit()
         return 'done'
         
-            
+    #Método DELETE utilizado pelo ADMIN
+    #modos para testar:
+    #curl -X DELETE http://192.168.0.13:8080/api/data/codigo
     def DELETE(self,codigo):
         with sqlite3.connect(DB_STRING) as c:        
             c.execute("DELETE FROM lixeiras WHERE codigo like ?", [codigo])    

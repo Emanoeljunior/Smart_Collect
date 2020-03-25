@@ -22,8 +22,8 @@ def setup_database():
     """
     with sqlite3.connect(DB_STRING) as con:
         try:
-            con.execute("CREATE TABLE lixeiras (codigo varchar(255), volume int, local varchar(255))")
-            con.execute("CREATE TABLE truckers (codigo varchar(255), volume int, local varchar(255))")
+            con.execute("CREATE TABLE lixeiras (codigo varchar(255) NOT NULL, volume int, local varchar(255) NOT NULL)")
+            con.execute("CREATE TABLE truckers (codigo varchar(255) NOT NULL, volume int, local varchar(255) NOT NULL)")
         except:
             print ('already exists')
             
@@ -44,14 +44,23 @@ class Interface(object):
     def cleanup(self):
         cleanup_database()
         setup_database()       
-    
 
 class Lixeira(object):
     def __init__(self):
         self.codigo=""
         self.volume=""
         self.local=""
-    
+        
+    def return_JSON(self):
+        data = json.dumps(self.__dict__)
+        return data
+
+class Trucker(object):
+    def __init__(self):
+        self.codigo=""
+        self.volume=""
+        self.local=""
+
     def return_JSON(self):
         data = json.dumps(self.__dict__)
         return data
@@ -111,7 +120,21 @@ class Data():
     #curl -X DELETE http://192.168.0.13:8080/api/data/codigo
     def DELETE(self,codigo):
         with sqlite3.connect(DB_STRING) as c:        
-            c.execute("DELETE FROM lixeiras WHERE codigo like ?", [codigo])    
+            c.execute("DELETE FROM lixeiras WHERE codigo like ?", [codigo]) 
+
+class Datatrucker():
+    exposed = True
+    @cherrypy.tools.json_in()
+    def POST(self):
+        data = cherrypy.request.json
+        trucker = Trucker()
+        trucker.__dict__ = data
+        truckers.append(trucker)
+        with sqlite3.connect(DB_STRING) as c:
+            c.execute("INSERT INTO truckers VALUES (?, ?, ?)",
+                       [trucker.codigo,trucker.volume,trucker.local])
+            c.commit()
+        return 'done'   
 
 
 def CORS():
@@ -119,12 +142,19 @@ def CORS():
 
 if __name__ == '__main__':
     lixeiras = []
+    truckers = []
 
     conf = {
     '/': {'tools.sessions.on': True}
     }
     cherrypy.tree.mount(
-    Data(), '/api/data',
+    Data(), '/api/dataLixeira',
+        {'/':
+            {'request.dispatch': cherrypy.dispatch.MethodDispatcher(),'tools.CORS.on': True}
+        }
+    )
+    cherrypy.tree.mount(
+    Datatrucker(), '/api/dataTrucker',
         {'/':
             {'request.dispatch': cherrypy.dispatch.MethodDispatcher(),'tools.CORS.on': True}
         }

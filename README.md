@@ -1,6 +1,19 @@
+ ![SmartCollect](images/smartCollect.jpeg)
 # Smart_Collect
 
-	Repositório do trabalho para a disciplina de IoT.
- 	Smart_collect é uma aplicação voltada para o gerenciamento de lixo em uma cidade.
- 	Através de sensores presentes nas lixeiras, será possível monitorar o quão cheia cada uma estará e sua localização.
- 	Com isso, será possível traçar uma melhor rota para os lixeiros (caminhões) recolherem os lixo.
+## About
+
+	This repository was developed for IoT class.
+ 	Smart_collect is a aplication for trash's truck management in a city.
+ 	It will use sensors and GPS at bins, to know how full is a bin and its location.
+ 	Then traces a optimizated route for Truckers.
+---
+## Architeture
+![Arquiteture](images/Arquitetura.png)
+
+---
+## Technologies
+* Python 
+* Cherrypy
+  
+ 

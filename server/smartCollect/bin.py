@@ -51,7 +51,7 @@ class DataBin():
                 else:
                     return None
  
-    #Metodo POST utilizado pelo dispositivo IOT (bins) - enviando para o Servidor
+    #Metodo POST utilizado pelo dispositivo mobile para cadastrar lixeiras
     #modos para testar:
     #curl -H "Content-Type: application/json" -X POST -d '{"ID":"12A", "volume":"100", "local":"102"}' http://127.0.0.1:8080/api/dataBin
     #WINDOWS: curl -H "Content-Type: application/json" -X POST -d "{\"ID\":\"12A\", \"volume\":\"100\", "local\":\"102\"}" http://192.168.0.13:8080/api/data
@@ -60,14 +60,29 @@ class DataBin():
         data = cherrypy.request.json
         bin = Bin()
         bin.__dict__ = data
-        print: "is here"
             
         with sqlite3.connect(DB_STRING) as c:
             c.execute("INSERT INTO bins VALUES (?, ?, ?)",
                        [bin.ID,bin.volume,bin.local])
             c.commit()
         return 'done'
-        
+    
+    #Metodo PUT utilizado pelo dispositivo IOT (bins) - enviando para o Servidor
+    #modos para testar:
+    #curl -H "Content-Type: application/json" -X PUT -d '{"ID":"12A", "volume":"100", "local":"102"}' http://127.0.0.1:8080/api/dataBin
+    #WINDOWS: curl -H "Content-Type: application/json" -X POST -d "{\"ID\":\"12A\", \"volume\":\"100\", "local\":\"102\"}" http://192.168.0.13:8080/api/data
+    @cherrypy.tools.json_in()
+    def PUT(self):
+        data = cherrypy.request.json
+        bin = Bin()
+        bin.__dict__ = data
+    
+            
+        with sqlite3.connect(DB_STRING) as c:
+            c.execute("INSERT INTO bins VALUES (?, ?, ?)",
+                       [bin.ID,bin.volume,bin.local])
+            c.commit()
+        return 'done' 
     #Método DELETE utilizado pelo ADMIN
     #modos para testar:
     #curl -X DELETE http://192.168.0.13:8080/api/data/ID

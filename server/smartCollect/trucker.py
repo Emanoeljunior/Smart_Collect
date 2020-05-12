@@ -9,7 +9,8 @@ from pydantic import BaseModel, ValidationError, validator
 
 from smartCollect import DB_STRING, database
 class Trucker(BaseModel):
-    ID =' '
+    __ID: str = ''.join(random.choice(string.ascii_uppercase 
+        + string.digits + string.ascii_lowercase) for _ in range(8))
     volume: float
     local: str
    
@@ -42,6 +43,7 @@ class Datatrucker():
                 else:
                     return None
  
+    # Method to register a user (Trucker)
     @cherrypy.tools.json_in()
     def POST(self):
         data = cherrypy.request.json
@@ -49,10 +51,8 @@ class Datatrucker():
             trucker = Trucker.parse_obj(data)
         except ValidationError as e:
             raise cherrypy.HTTPError(400,str(e))
-        trucker.ID = ''.join(random.choice(string.ascii_uppercase 
-        + string.digits + string.ascii_lowercase) for _ in range(8))
         with sqlite3.connect(DB_STRING) as c:
             c.execute("INSERT INTO truckers VALUES (?, ?, ?)",
-                       [trucker.ID,trucker.volume,trucker.local])
+                       [trucker._Trucker__ID,trucker.volume,trucker.local])
             c.commit()
         return 'done'   

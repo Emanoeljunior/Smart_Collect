@@ -1,7 +1,0 @@
-runtime: python37
-threadsafe: true
-
-handlers:
-- url: /.*
-  script: main.app
-

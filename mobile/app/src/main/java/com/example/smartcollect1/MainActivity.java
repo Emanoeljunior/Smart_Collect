@@ -51,5 +51,9 @@ db.close();*/
         Intent it = new Intent(MainActivity.this, TelaCadastro.class);
         startActivity(it);
     }
+    private void sincronizar(){
+        HttpClient client = new HttpClient(this);
+        client.getJsonList(this);
+    }
 
 }

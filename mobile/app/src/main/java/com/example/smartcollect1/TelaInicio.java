@@ -25,4 +25,10 @@ public class TelaInicio extends AppCompatActivity {
         startActivity(it);
     }
 
+    public void telaMonitorar(View view){
+        Intent it = new Intent(TelaInicio.this, TelaMonitorar.class);
+        startActivity(it);
+
+    }
+
 }

@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.smartcollect1">
+    package="com.example.smartcollect1" >
 
-    <uses-feature android:name="android.hardware.camera"
+    <uses-permission android:name="android.permission.camera" />
+
+    <uses-feature
+        android:name="android.hardware.camera"
         android:required="true" />
-    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -12,12 +17,17 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
-        <activity android:name=".TelaCadLixeira"></activity>
+        android:theme="@style/AppTheme" >
+        <activity android:name=".TelaMonitorar" >
+        </activity>
+
+
+
+        <activity android:name=".TelaCadLixeira" />
         <activity android:name=".TelaNavegacao" />
         <activity android:name=".TelaCadastro" />
         <activity android:name=".TelaInicio" />
-        <activity android:name=".MainActivity">
+        <activity android:name=".MainActivity" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

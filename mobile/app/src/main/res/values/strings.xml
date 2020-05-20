@@ -2,5 +2,7 @@
     <string name="app_name">SmartCollect</string>
     <string name="login">Login</string>
     <string name="cadastrar">Cadastrar</string>
+    <string name="buscar">Buscar</string>
     <string name="voltar">Voltar</string>
+
 </resources>

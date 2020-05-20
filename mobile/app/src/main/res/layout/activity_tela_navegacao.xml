@@ -17,7 +17,6 @@
         android:background="#E91E63"
         android:text="@string/voltar"
         android:textColor="#FFFFFF"
-        android:onClick="voltarBT"
         app:layout_constraintBottom_toTopOf="@+id/imageView5"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />

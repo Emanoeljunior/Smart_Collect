@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/SmartCollect1.iml" filepath="$PROJECT_DIR$/SmartCollect1.iml" group="SmartCollect1" />
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" group="SmartCollect1/app" />
+      <module fileurl="file://$PROJECT_DIR$/SmartCollect.iml" filepath="$PROJECT_DIR$/SmartCollect.iml" group="SmartCollect" />
+      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" group="SmartCollect/app" />
     </modules>
   </component>
 </project>

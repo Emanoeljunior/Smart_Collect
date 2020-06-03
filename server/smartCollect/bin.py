@@ -2,10 +2,9 @@
 import random
 import string
 import json
-import sqlite3
 import cherrypy
 
-from smartCollect import DB_STRING
+from smartCollect import cnx
 
 class Bin(object):
     def __init__(self):
@@ -20,73 +19,58 @@ class Bin(object):
 
 class DataBin():
     exposed = True
-   
-    # Método GET que será utilizado pelo admin e pela API do google
-    #modos para testar:
-    #curl -v http://192.168.0.13:8080/api/data/local - substituir pelo ip da máquina
-    #curl -v http://192.168.0.13:8080/api/data/ - substituir pelo ip da máquina
-    @cherrypy.tools.json_out()   
+
+    @cherrypy.tools.json_out()
     def GET(self, local=None):
         if local is None:
             l=[]
-            with sqlite3.connect(DB_STRING) as c:
-                for row in c.execute('SELECT * FROM bins ORDER BY ID'):
+            with cnx.cursor() as c:
+                sql ='SELECT * FROM bins  ORDER BY ID'
+                c.execute(sql,)
+                rows = c.fetchall()
+                
+                for row in rows:
                     bin = Bin()
                     bin.ID = row[0]
                     bin.volume = row[1]
                     bin.local = row[2]
                     print(bin.__dict__)
                     l.append(bin.return_JSON())
-                return('Bins \n: %s' % str(l) )
+            c.close()
+            return('Bins \n: %s' % str(l) )
         else:
-            with sqlite3.connect(DB_STRING) as c:
-                r = c.execute('SELECT * FROM bins WHERE local like ?',[local])
-                variavel = r.fetchone()
-                if variavel is not None:
-                    bin = Bin()
-                    bin.ID = variavel[0] 
-                    bin.volume = variavel[1]
-                    bin.local = variavel[2]
-                    return(bin.return_JSON())
-                else:
-                    return None
- 
-    #Metodo POST utilizado pelo dispositivo mobile para cadastrar lixeiras
-    #modos para testar:
-    #curl -H "Content-Type: application/json" -X POST -d '{"ID":"12A", "volume":"100", "local":"102"}' http://127.0.0.1:8080/api/dataBin
-    #WINDOWS: curl -H "Content-Type: application/json" -X POST -d "{\"ID\":\"12A\", \"volume\":\"100\", "local\":\"102\"}" http://192.168.0.13:8080/api/data
+            with cnx.cursor() as c:
+                sql = 'SELECT * FROM bins WHERE local like %s'
+                c.execute(sql, local)
+                variavel = c.fetchone()
+            c.close()
+            if variavel is not None:
+                bin = Bin()
+                bin.ID = variavel[0] 
+                bin.volume = variavel[1]
+                bin.local = variavel[2]
+                return(bin.return_JSON())
+            else:
+                return None
+
     @cherrypy.tools.json_in()
     def POST(self):
         data = cherrypy.request.json
         bin = Bin()
         bin.__dict__ = data
             
-        with sqlite3.connect(DB_STRING) as c:
-            c.execute("INSERT INTO bins VALUES (?, ?, ?)",
-                       [bin.ID,bin.volume,bin.local])
-            c.commit()
+        with cnx.cursor() as c:
+            sql = "INSERT INTO bins  VALUES (%s, %s, %s)"
+            c.execute(sql,(bin.ID,bin.volume,bin.local))
+        cnx.commit()
+        c.close()
         return 'done'
-    
-    #Metodo PUT utilizado pelo dispositivo IOT (bins) - enviando para o Servidor
-    #modos para testar:
-    #curl -H "Content-Type: application/json" -X PUT -d '{"ID":"12A", "volume":"100", "local":"102"}' http://127.0.0.1:8080/api/dataBin
-    #WINDOWS: curl -H "Content-Type: application/json" -X POST -d "{\"ID\":\"12A\", \"volume\":\"100\", "local\":\"102\"}" http://192.168.0.13:8080/api/data
-    @cherrypy.tools.json_in()
-    def PUT(self):
-        data = cherrypy.request.json
-        bin = Bin()
-        bin.__dict__ = data
-    
-            
-        with sqlite3.connect(DB_STRING) as c:
-            c.execute("INSERT INTO bins VALUES (?, ?, ?)",
-                       [bin.ID,bin.volume,bin.local])
-            c.commit()
-        return 'done' 
-    #Método DELETE utilizado pelo ADMIN
-    #modos para testar:
-    #curl -X DELETE http://192.168.0.13:8080/api/data/ID
-    def DELETE(self,ID):
-        with sqlite3.connect(DB_STRING) as c:        
-            c.execute("DELETE FROM bins WHERE ID like ?", [ID]) 
 
+    def DELETE(self, ID):
+        with cnx.cursor() as c:
+            sql = 'DELETE FROM bins WHERE id = %s'
+            c.execute(sql, (ID,))
+        cnx.commit() 
+        c.close()
+                   
+           

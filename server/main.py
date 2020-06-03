@@ -1,39 +1,55 @@
-# -*- coding: utf-8 -*-
-import random
-import wsgiref.handlers
-import string
+# Copyright 2018 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# [START gae_python37_cloudsql_mysql]
+import os
 import cherrypy
-import json
-import sqlite3
-from smartCollect import bin, trucker, database 
+import wsgiref.handlers
+import pymysql
+from smartCollect import cnx,bin,trucker,usuario, database
 
 class Interface(object):
+
     @cherrypy.expose
     def index(self):
-        return frontpage
-    
-    @cherrypy.expose
-    def cleanup(self):
-        database.cleanup_database()
-        database.setup_database()       
+        with cnx.cursor() as con:
+            try:
+                con.execute("CREATE TABLE usuarios (nome varchar(255), email varchar(255), senha varchar(255) NOT NULL)")
+                con.execute("CREATE TABLE bins (ID varchar(255), volume int, local varchar(255) NOT NULL)")
+                con.execute("CREATE TABLE truckers (ID varchar(255), volume int, local varchar(255) NOT NULL)")
+                cnx.commit()
+                
+            except:
+                print ('already exists')
+        con.close()
+        return str('Ola')
+
+# [END gae_python37_cloudsql_mysql]
+
 
 
 def CORS():
 	    cherrypy.response.headers["Access-Control-Allow-Origin"] = "*"
 
-if __name__ == '__main__':
-
-    conf = {'/':
+conf = {'/':
             {'request.dispatch': cherrypy.dispatch.MethodDispatcher(),'tools.CORS.on': True}
         }
-        
-    cherrypy.tree.mount(bin.DataBin(), '/api/dataBin',conf)
-    app = cherrypy.tree.mount(trucker.Datatrucker(), '/api/dataTrucker', conf)
-    cherrypy.tools.CORS = cherrypy.Tool('before_handler', CORS)
-    cherrypy.config.update({'server.socket_host': '0.0.0.0','server.socket_port': 8080})
-    cherrypy.engine.subscribe('start', database.setup_database())
-    wsgiref.handlers.CGIHandler().run(app)
-    
 
-
-
+cherrypy.tree.mount(usuario.DataUsuario(), '/api/dataUsuario', conf)
+cherrypy.tree.mount(trucker.DataTrucker(), '/api/dataTrucker', conf)
+cherrypy.tree.mount(bin.DataBin(), '/api/dataBin', conf)
+cherrypy.tree.mount(Interface(), '/')
+cherrypy.tools.CORS = cherrypy.Tool('before_handler', CORS)
+app = cherrypy.tree
+wsgiref.handlers.CGIHandler().run(app)

@@ -1,58 +1,74 @@
 # -*- coding: utf-8 -*-
 import random
 import string
-import sys
-import cherrypy
 import json
-import sqlite3
-from pydantic import BaseModel, ValidationError, validator
+import cherrypy
 
-from smartCollect import DB_STRING, database
-class Trucker(BaseModel):
-    __ID: str = ''.join(random.choice(string.ascii_uppercase 
-        + string.digits + string.ascii_lowercase) for _ in range(8))
-    volume: float
-    local: str
-   
- 
-class Datatrucker():
- 
+from smartCollect import cnx
+
+class Trucker(object):
+    def __init__(self):
+        self.ID=""
+        self.volume=""
+        self.local=""
+        
+    def return_JSON(self):
+        data = json.dumps(self.__dict__)
+        return data
+
+
+class DataTrucker():
     exposed = True
-    
-    @cherrypy.tools.json_out()   
+
+    @cherrypy.tools.json_out()
     def GET(self, local=None):
         if local is None:
             l=[]
-            with sqlite3.connect(DB_STRING) as c:
-                
-                for row in c.execute('SELECT * FROM truckers ORDER BY local'):
-                    trucker = Trucker.parse_obj({'ID': row[0], 'volume': row[1], 'local': row[2]})
-                    print(trucker.dict())
-                    l.append(trucker.json())
-                return('Truckers \n: %s' % str(l) )
-        else:
-            with sqlite3.connect(DB_STRING) as c:
-                r = c.execute('SELECT * FROM truckers WHERE local like ?',[local])
-                variavel = r.fetchone()
-                if variavel is not None:
+            with cnx.cursor() as c:
+                sql ='SELECT * FROM truckers  ORDER BY ID'
+                c.execute(sql,)
+                rows = c.fetchall()
+            
+                for row in rows:
                     trucker = Trucker()
-                    trucker.ID = variavel[0] 
-                    trucker.volume = variavel[1]
-                    trucker.local = variavel[2]
-                    return(trucker.return_JSON())
-                else:
-                    return None
- 
-    # Method to register a user (Trucker)
+                    trucker.ID = row[0]
+                    trucker.volume = row[1]
+                    trucker.local = row[2]
+                    print(trucker.__dict__)
+                    l.append(trucker.return_JSON())
+            c.close()
+            return('Truckers \n: %s' % str(l) )
+        else:
+            with cnx.cursor() as c:
+                sql = 'SELECT * FROM truckers WHERE local like %s'
+                c.execute(sql, local)
+                variavel = c.fetchone()
+            c.close()
+            if variavel is not None:
+                trucker = Trucker()
+                trucker.ID = variavel[0] 
+                trucker.volume = variavel[1]
+                trucker.local = variavel[2]
+                return(trucker.return_JSON())
+            else:
+                return None
+
     @cherrypy.tools.json_in()
     def POST(self):
         data = cherrypy.request.json
-        try:
-            trucker = Trucker.parse_obj(data)
-        except ValidationError as e:
-            raise cherrypy.HTTPError(400,str(e))
-        with sqlite3.connect(DB_STRING) as c:
-            c.execute("INSERT INTO truckers VALUES (?, ?, ?)",
-                       [trucker._Trucker__ID,trucker.volume,trucker.local])
-            c.commit()
-        return 'done'   
+        trucker = Trucker()
+        trucker.__dict__ = data
+            
+        with cnx.cursor() as c:
+            sql = "INSERT INTO truckers  VALUES (%s, %s, %s)"
+            c.execute(sql,(trucker.ID,trucker.volume,trucker.local))
+        cnx.commit()
+        c.close()
+        return 'done'
+
+    def DELETE(self, ID):
+        with cnx.cursor() as c:
+            sql = 'DELETE FROM truckers WHERE id = %s'
+            c.execute(sql, (ID,))
+        cnx.commit()     
+        c.close()

@@ -1,18 +1,4 @@
-# Copyright 2018 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
-# [START gae_python37_cloudsql_mysql]
 import os
 import cherrypy
 import wsgiref.handlers
@@ -23,20 +9,7 @@ class Interface(object):
 
     @cherrypy.expose
     def index(self):
-        with cnx.cursor() as con:
-            try:
-                con.execute("CREATE TABLE usuarios (nome varchar(255), email varchar(255), senha varchar(255) NOT NULL)")
-                con.execute("CREATE TABLE bins (ID varchar(255), volume int, local varchar(255) NOT NULL)")
-                con.execute("CREATE TABLE truckers (ID varchar(255), volume int, local varchar(255) NOT NULL)")
-                cnx.commit()
-                
-            except:
-                print ('already exists')
-        con.close()
-        return str('Ola')
-
-# [END gae_python37_cloudsql_mysql]
-
+        return str('Ola localhost cherrypy')
 
 
 def CORS():
@@ -51,5 +24,11 @@ cherrypy.tree.mount(trucker.DataTrucker(), '/api/dataTrucker', conf)
 cherrypy.tree.mount(bin.DataBin(), '/api/dataBin', conf)
 cherrypy.tree.mount(Interface(), '/')
 cherrypy.tools.CORS = cherrypy.Tool('before_handler', CORS)
-app = cherrypy.tree
-wsgiref.handlers.CGIHandler().run(app)
+if __name__ == '__main__':
+	cherrypy.config.update({'server.socket_host': '0.0.0.0','server.socket_port': 8080})
+	cherrypy.engine.start()
+	cherrypy.engine.block()
+else:
+	app = cherrypy.tree
+	wsgiref.handlers.CGIHandler().run(app)
+

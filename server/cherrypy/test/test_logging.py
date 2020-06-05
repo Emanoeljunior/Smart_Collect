@@ -1,35 +1,67 @@
 """Basic tests for the CherryPy core: request handling."""
 
-import os
-localDir = os.path.dirname(__file__)
+import logging
+
+from cheroot.test import webtest
+import pytest
+import requests  # FIXME: Temporary using it directly, better switch
 
 import cherrypy
-from cherrypy._cpcompat import ntob, ntou, py3k
+from cherrypy.test.logtest import LogCase
 
-access_log = os.path.join(localDir, "access.log")
-error_log = os.path.join(localDir, "error.log")
 
 # Some unicode strings.
-tartaros = ntou('\u03a4\u1f71\u03c1\u03c4\u03b1\u03c1\u03bf\u03c2', 'escape')
-erebos = ntou('\u0388\u03c1\u03b5\u03b2\u03bf\u03c2.com', 'escape')
+tartaros = u'\u03a4\u1f71\u03c1\u03c4\u03b1\u03c1\u03bf\u03c2'
+erebos = u'\u0388\u03c1\u03b5\u03b2\u03bf\u03c2.com'
 
 
-def setup_server():
+@pytest.fixture
+def access_log_file(tmp_path_factory):
+    return tmp_path_factory.mktemp('logs') / 'access.log'
+
+
+@pytest.fixture
+def error_log_file(tmp_path_factory):
+    return tmp_path_factory.mktemp('logs') / 'access.log'
+
+
+@pytest.fixture
+def server(configure_server):
+    cherrypy.engine.start()
+    cherrypy.engine.wait(cherrypy.engine.states.STARTED)
+
+    yield
+
+    shutdown_server()
+
+
+def shutdown_server():
+    cherrypy.engine.exit()
+    cherrypy.engine.block()
+
+    for name, server in getattr(cherrypy, 'servers', {}).copy().items():
+        server.unsubscribe()
+        del cherrypy.servers[name]
+
+
+@pytest.fixture
+def configure_server(access_log_file, error_log_file):
     class Root:
 
+        @cherrypy.expose
         def index(self):
-            return "hello"
-        index.exposed = True
+            return 'hello'
 
+        @cherrypy.expose
         def uni_code(self):
             cherrypy.request.login = tartaros
             cherrypy.request.remote.name = erebos
-        uni_code.exposed = True
 
+        @cherrypy.expose
         def slashes(self):
             cherrypy.request.request_line = r'GET /slashed\path HTTP/1.1'
-        slashes.exposed = True
 
+        @cherrypy.expose
         def whitespace(self):
             # User-Agent = "User-Agent" ":" 1*( product | comment )
             # comment    = "(" *( ctext | quoted-pair | comment ) ")"
@@ -37,139 +69,220 @@ def setup_server():
             # TEXT       = <any OCTET except CTLs, but including LWS>
             # LWS        = [CRLF] 1*( SP | HT )
             cherrypy.request.headers['User-Agent'] = 'Browzuh (1.0\r\n\t\t.3)'
-        whitespace.exposed = True
 
+        @cherrypy.expose
         def as_string(self):
-            return "content"
-        as_string.exposed = True
+            return 'content'
 
+        @cherrypy.expose
         def as_yield(self):
-            yield "content"
-        as_yield.exposed = True
+            yield 'content'
 
+        @cherrypy.expose
+        @cherrypy.config(**{'tools.log_tracebacks.on': True})
         def error(self):
             raise ValueError()
-        error.exposed = True
-        error._cp_config = {'tools.log_tracebacks.on': True}
 
     root = Root()
 
-    cherrypy.config.update({'log.error_file': error_log,
-                            'log.access_file': access_log,
-                            })
+    cherrypy.config.reset()
+    cherrypy.config.update({
+        'server.socket_host': webtest.WebCase.HOST,
+        'server.socket_port': webtest.WebCase.PORT,
+        'server.protocol_version': webtest.WebCase.PROTOCOL,
+        'environment': 'test_suite',
+    })
+    cherrypy.config.update({
+        'log.error_file': str(error_log_file),
+        'log.access_file': str(access_log_file),
+    })
     cherrypy.tree.mount(root)
 
 
-from cherrypy.test import helper, logtest
+@pytest.fixture
+def log_tracker(access_log_file):
+    class LogTracker(LogCase):
+        logfile = str(access_log_file)
+    return LogTracker()
 
 
-class AccessLogTests(helper.CPWebCase, logtest.LogCase):
-    setup_server = staticmethod(setup_server)
+def test_normal_return(log_tracker, server):
+    log_tracker.markLog()
+    host = webtest.interface(webtest.WebCase.HOST)
+    port = webtest.WebCase.PORT
+    resp = requests.get(
+        'http://%s:%s/as_string' % (host, port),
+        headers={
+            'Referer': 'http://www.cherrypy.org/',
+            'User-Agent': 'Mozilla/5.0',
+        },
+    )
+    expected_body = 'content'
+    assert resp.text == expected_body
+    assert resp.status_code == 200
 
-    logfile = access_log
+    intro = '%s - - [' % host
 
-    def testNormalReturn(self):
-        self.markLog()
-        self.getPage("/as_string",
-                     headers=[('Referer', 'http://www.cherrypy.org/'),
-                              ('User-Agent', 'Mozilla/5.0')])
-        self.assertBody('content')
-        self.assertStatus(200)
+    log_tracker.assertLog(-1, intro)
 
-        intro = '%s - - [' % self.interface()
+    content_length = len(expected_body)
+    if not any(
+            k for k, v in resp.headers.items()
+            if k.lower() == 'content-length'
+    ):
+        content_length = '-'
 
-        self.assertLog(-1, intro)
-
-        if [k for k, v in self.headers if k.lower() == 'content-length']:
-            self.assertLog(-1, '] "GET %s/as_string HTTP/1.1" 200 7 '
-                           '"http://www.cherrypy.org/" "Mozilla/5.0"'
-                           % self.prefix())
-        else:
-            self.assertLog(-1, '] "GET %s/as_string HTTP/1.1" 200 - '
-                           '"http://www.cherrypy.org/" "Mozilla/5.0"'
-                           % self.prefix())
-
-    def testNormalYield(self):
-        self.markLog()
-        self.getPage("/as_yield")
-        self.assertBody('content')
-        self.assertStatus(200)
-
-        intro = '%s - - [' % self.interface()
-
-        self.assertLog(-1, intro)
-        if [k for k, v in self.headers if k.lower() == 'content-length']:
-            self.assertLog(-1, '] "GET %s/as_yield HTTP/1.1" 200 7 "" ""' %
-                           self.prefix())
-        else:
-            self.assertLog(-1, '] "GET %s/as_yield HTTP/1.1" 200 - "" ""'
-                           % self.prefix())
-
-    def testCustomLogFormat(self):
-        '''Test a customized access_log_format string,
-           which is a feature of _cplogging.LogManager.access() '''
-
-        original_logformat = cherrypy._cplogging.LogManager.access_log_format
-        cherrypy._cplogging.LogManager.access_log_format = \
-          '{h} {l} {u} {t} "{r}" {s} {b} "{f}" "{a}" {o}' \
-          if py3k else \
-          '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(o)s'
-
-        self.markLog()
-        self.getPage("/as_string", headers=[('Referer', 'REFERER'),
-                                            ('User-Agent', 'USERAGENT'),
-                                            ('Host', 'HOST')])
-        self.assertLog(-1, '%s - - [' % self.interface())
-        self.assertLog(-1, '] "GET /as_string HTTP/1.1" '
-                           '200 7 "REFERER" "USERAGENT" HOST')
-
-        cherrypy._cplogging.LogManager.access_log_format = original_logformat
-
-    def testEscapedOutput(self):
-        # Test unicode in access log pieces.
-        self.markLog()
-        self.getPage("/uni_code")
-        self.assertStatus(200)
-        if py3k:
-            # The repr of a bytestring in py3k includes a b'' prefix
-            self.assertLog(-1, repr(tartaros.encode('utf8'))[2:-1])
-        else:
-            self.assertLog(-1, repr(tartaros.encode('utf8'))[1:-1])
-        # Test the erebos value. Included inline for your enlightenment.
-        # Note the 'r' prefix--those backslashes are literals.
-        self.assertLog(-1, r'\xce\x88\xcf\x81\xce\xb5\xce\xb2\xce\xbf\xcf\x82')
-
-        # Test backslashes in output.
-        self.markLog()
-        self.getPage("/slashes")
-        self.assertStatus(200)
-        if py3k:
-            self.assertLog(-1, ntob('"GET /slashed\\path HTTP/1.1"'))
-        else:
-            self.assertLog(-1, r'"GET /slashed\\path HTTP/1.1"')
-
-        # Test whitespace in output.
-        self.markLog()
-        self.getPage("/whitespace")
-        self.assertStatus(200)
-        # Again, note the 'r' prefix.
-        self.assertLog(-1, r'"Browzuh (1.0\r\n\t\t.3)"')
+    log_tracker.assertLog(
+        -1,
+        '] "GET /as_string HTTP/1.1" 200 %s '
+        '"http://www.cherrypy.org/" "Mozilla/5.0"'
+        % content_length,
+    )
 
 
-class ErrorLogTests(helper.CPWebCase, logtest.LogCase):
-    setup_server = staticmethod(setup_server)
+def test_normal_yield(log_tracker, server):
+    log_tracker.markLog()
+    host = webtest.interface(webtest.WebCase.HOST)
+    port = webtest.WebCase.PORT
+    resp = requests.get(
+        'http://%s:%s/as_yield' % (host, port),
+        headers={
+            'User-Agent': '',
+        },
+    )
+    expected_body = 'content'
+    assert resp.text == expected_body
+    assert resp.status_code == 200
 
-    logfile = error_log
+    intro = '%s - - [' % host
 
-    def testTracebacks(self):
-        # Test that tracebacks get written to the error log.
-        self.markLog()
-        ignore = helper.webtest.ignored_exceptions
-        ignore.append(ValueError)
-        try:
-            self.getPage("/error")
-            self.assertInBody("raise ValueError()")
-            self.assertLog(0, 'HTTP Traceback (most recent call last):')
-            self.assertLog(-3, 'raise ValueError()')
-        finally:
-            ignore.pop()
+    log_tracker.assertLog(-1, intro)
+    content_length = len(expected_body)
+    if not any(
+            k for k, v in resp.headers.items()
+            if k.lower() == 'content-length'
+    ):
+        content_length = '-'
+
+    log_tracker.assertLog(
+        -1,
+        '] "GET /as_yield HTTP/1.1" 200 %s "" ""'
+        % content_length,
+    )
+
+
+def test_custom_log_format(log_tracker, monkeypatch, server):
+    """Test a customized access_log_format string, which is a
+    feature of _cplogging.LogManager.access()."""
+    monkeypatch.setattr(
+        'cherrypy._cplogging.LogManager.access_log_format',
+        '{h} {l} {u} {t} "{r}" {s} {b} "{f}" "{a}" {o}',
+    )
+    log_tracker.markLog()
+    host = webtest.interface(webtest.WebCase.HOST)
+    port = webtest.WebCase.PORT
+    requests.get(
+        'http://%s:%s/as_string' % (host, port),
+        headers={
+            'Referer': 'REFERER',
+            'User-Agent': 'USERAGENT',
+            'Host': 'HOST',
+        },
+    )
+    log_tracker.assertLog(-1, '%s - - [' % host)
+    log_tracker.assertLog(
+        -1,
+        '] "GET /as_string HTTP/1.1" '
+        '200 7 "REFERER" "USERAGENT" HOST',
+    )
+
+
+def test_timez_log_format(log_tracker, monkeypatch, server):
+    """Test a customized access_log_format string, which is a
+    feature of _cplogging.LogManager.access()."""
+    monkeypatch.setattr(
+        'cherrypy._cplogging.LogManager.access_log_format',
+        '{h} {l} {u} {z} "{r}" {s} {b} "{f}" "{a}" {o}',
+    )
+    log_tracker.markLog()
+
+    expected_time = str(cherrypy._cplogging.LazyRfc3339UtcTime())
+    monkeypatch.setattr(
+        'cherrypy._cplogging.LazyRfc3339UtcTime',
+        lambda: expected_time,
+    )
+    host = webtest.interface(webtest.WebCase.HOST)
+    port = webtest.WebCase.PORT
+    requests.get(
+        'http://%s:%s/as_string' % (host, port),
+        headers={
+            'Referer': 'REFERER',
+            'User-Agent': 'USERAGENT',
+            'Host': 'HOST',
+        },
+    )
+
+    log_tracker.assertLog(-1, '%s - - ' % host)
+    log_tracker.assertLog(-1, expected_time)
+    log_tracker.assertLog(
+        -1,
+        ' "GET /as_string HTTP/1.1" '
+        '200 7 "REFERER" "USERAGENT" HOST',
+    )
+
+
+def test_UUIDv4_parameter_log_format(log_tracker, monkeypatch, server):
+    """Test rendering of UUID4 within access log."""
+    monkeypatch.setattr(
+        'cherrypy._cplogging.LogManager.access_log_format',
+        '{i}',
+    )
+    log_tracker.markLog()
+    host = webtest.interface(webtest.WebCase.HOST)
+    port = webtest.WebCase.PORT
+    requests.get('http://%s:%s/as_string' % (host, port))
+    log_tracker.assertValidUUIDv4()
+
+
+def test_escaped_output(log_tracker, server):
+    # Test unicode in access log pieces.
+    log_tracker.markLog()
+    host = webtest.interface(webtest.WebCase.HOST)
+    port = webtest.WebCase.PORT
+    resp = requests.get('http://%s:%s/uni_code' % (host, port))
+    assert resp.status_code == 200
+    # The repr of a bytestring includes a b'' prefix
+    log_tracker.assertLog(-1, repr(tartaros.encode('utf8'))[2:-1])
+    # Test the erebos value. Included inline for your enlightenment.
+    # Note the 'r' prefix--those backslashes are literals.
+    log_tracker.assertLog(
+        -1,
+        r'\xce\x88\xcf\x81\xce\xb5\xce\xb2\xce\xbf\xcf\x82',
+    )
+
+    # Test backslashes in output.
+    log_tracker.markLog()
+    resp = requests.get('http://%s:%s/slashes' % (host, port))
+    assert resp.status_code == 200
+    log_tracker.assertLog(-1, b'"GET /slashed\\path HTTP/1.1"')
+
+    # Test whitespace in output.
+    log_tracker.markLog()
+    resp = requests.get('http://%s:%s/whitespace' % (host, port))
+    assert resp.status_code == 200
+    # Again, note the 'r' prefix.
+    log_tracker.assertLog(-1, r'"Browzuh (1.0\r\n\t\t.3)"')
+
+
+def test_tracebacks(server, caplog):
+    host = webtest.interface(webtest.WebCase.HOST)
+    port = webtest.WebCase.PORT
+    with caplog.at_level(logging.ERROR, logger='cherrypy.error'):
+        resp = requests.get('http://%s:%s/error' % (host, port))
+
+    rec = caplog.records[0]
+    exc_cls, exc_msg = rec.exc_info[0], rec.message
+
+    assert 'raise ValueError()' in resp.text
+    assert 'HTTP' in exc_msg
+    assert exc_cls is ValueError

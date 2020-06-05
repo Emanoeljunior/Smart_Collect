@@ -35,7 +35,7 @@ public class HttpClient {
     }
 
     public void postJson(JSONObject jsonBody) {
-        JsonObjectRequest jsObjRequest = new JsonObjectRequest(Request.Method.POST, url +"/api/dataUsuario", jsonBody, new Response.Listener<JSONObject>() {
+        JsonObjectRequest jsObjRequest = new JsonObjectRequest(Request.Method.POST, url +"/api/dataUser", jsonBody, new Response.Listener<JSONObject>() {
             @Override
             public void onResponse(JSONObject response) {
                 Log.d("RQ", "Retornou do request");

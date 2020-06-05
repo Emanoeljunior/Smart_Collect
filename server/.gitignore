@@ -1,2 +1,4 @@
 smartCollect/__pycache__
-my.db
+cloud_sql_proxy
+.vscode
+

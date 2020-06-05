@@ -1,10 +1,10 @@
 import cherrypy
-from cherrypy._cpcompat import ntob
 from cherrypy.test import helper
 
 
 class WSGI_Namespace_Test(helper.CPWebCase):
 
+    @staticmethod
     def setup_server():
 
         class WSGIResponse(object):
@@ -23,7 +23,7 @@ class WSGI_Namespace_Test(helper.CPWebCase):
                 return next(self.iter)
 
             def close(self):
-                if hasattr(self.appresults, "close"):
+                if hasattr(self.appresults, 'close'):
                     self.appresults.close()
 
         class ChangeCase(object):
@@ -70,25 +70,24 @@ class WSGI_Namespace_Test(helper.CPWebCase):
 
         class Root(object):
 
+            @cherrypy.expose
             def index(self):
-                return "HellO WoRlD!"
-            index.exposed = True
+                return 'HellO WoRlD!'
 
         root_conf = {'wsgi.pipeline': [('replace', Replacer)],
-                     'wsgi.replace.map': {ntob('L'): ntob('X'),
-                                          ntob('l'): ntob('r')},
+                     'wsgi.replace.map': {b'L': b'X',
+                                          b'l': b'r'},
                      }
 
         app = cherrypy.Application(Root())
         app.wsgiapp.pipeline.append(('changecase', ChangeCase))
         app.wsgiapp.config['changecase'] = {'to': 'upper'}
         cherrypy.tree.mount(app, config={'/': root_conf})
-    setup_server = staticmethod(setup_server)
 
     def test_pipeline(self):
         if not cherrypy.server.httpserver:
             return self.skip()
 
-        self.getPage("/")
+        self.getPage('/')
         # If body is "HEXXO WORXD!", the middleware was applied out of order.
-        self.assertBody("HERRO WORRD!")
+        self.assertBody('HERRO WORRD!')

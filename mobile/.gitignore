@@ -1,0 +1,11 @@
+### Gradle ###
+.gradle
+/build/ 
+
+local.properties
+app/src/debug
+app/src/androidTest
+app/src/release
+app/src/test
+app/src/main/java/com/alvitre/SmartCollect/repository/remote/MapsActivity.java
+
